@@ -1,0 +1,533 @@
+{
+  "name": "AI Export RFQ Pre-Quote Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Request for Quotation",
+        "formDescription": "Tell us about your product requirements. Our AI-assisted RFQ system will analyze your request and prepare it for technical review.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Buyer Name"
+            },
+            {
+              "fieldLabel": "Company Name"
+            },
+            {
+              "fieldLabel": "Business Email"
+            },
+            {
+              "fieldLabel": "Country / Market"
+            },
+            {
+              "fieldLabel": "Product Category"
+            },
+            {
+              "fieldLabel": "RFQ / Product Requirements",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        -272
+      ],
+      "id": "772f8b22-381c-44a9-bdea-7a847d2e1b11",
+      "name": "On form submission"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-5-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are an AI Pre-Quote Copilot for Chinese consumer electronics OEM/ODM manufacturers.\n\nAnalyze the incoming overseas RFQ and determine whether it contains enough information to proceed toward quotation.\n\nINPUT\n\nBuyer Name:\n{{ $json[\"Buyer Name\"] }}\n\nCompany Name:\n{{ $json[\"Company Name\"] }}\n\nBusiness Email:\n{{ $json[\"Business Email\"] }}\n\nCountry / Market:\n{{ $json[\"Country / Market\"] }}\n\nProduct Category:\n{{ $json[\"Product Category\"] }}\n\nRFQ / Product Requirements:\n{{ $json[\"RFQ / Product Requirements\"] }}\n\nTASK\n\nFor AI Voice Recorder RFQs, analyze the following requirements:\n\nAR01 Product Form / Reference Model\nAR02 Recording Requirement\nAR03 Microphone Configuration\nAR04 Storage Capacity\nAR05 Battery / Runtime\nAR06 Charging Interface\nAR07 Bluetooth / Wi-Fi Requirement\nAR08 AI / Transcription Functions\nAR09 APP / Cloud Requirement\nAR10 Language Requirements\nAR11 OEM / ODM Customization Scope\nAR12 Quantity\n\nEach requirement must have exactly one status:\n\nknown\nunknown\nnot_required\n\nDo not invent information.\n\nQUOTE READINESS RULES\n\nQ0 = Insufficient RFQ\nProduct or quantity is unknown, or there is too little usable information.\n\nQ1 = Clarification Required\nBasic RFQ information exists but one or more critical requirements are still unknown.\n\nQ2 = Ready for Internal Review\nCustomer-facing critical requirements are sufficiently clear and the RFQ can be routed to engineering, procurement, or compliance.\n\nQ3 = Ready to Quote\nEngineering, procurement, compliance, lead time, and commercial conditions have already been confirmed.\n\nCritical blockers include:\n- unclear product\n- unknown quantity\n- unclear recording requirements when they affect product selection\n- unclear AI/transcription scope when AI is requested\n- unclear APP/cloud scope when APP/cloud functionality is requested\n- unclear OEM/ODM customization scope when customization is requested\n- unresolved technical feasibility\n\nReturn ONLY valid JSON.\n\nUse exactly this structure:\n\n{\n  \"buyer\": {\n    \"name\": \"\",\n    \"company\": \"\",\n    \"country_market\": \"\",\n    \"email\": \"\"\n  },\n  \"product\": {\n    \"category\": \"\",\n    \"quantity\": \"\"\n  },\n  \"requirements\": {\n    \"AR01_product_form\": {\"status\": \"\", \"value\": \"\"},\n    \"AR02_recording_requirement\": {\"status\": \"\", \"value\": \"\"},\n    \"AR03_microphone_configuration\": {\"status\": \"\", \"value\": \"\"},\n    \"AR04_storage_capacity\": {\"status\": \"\", \"value\": \"\"},\n    \"AR05_battery_runtime\": {\"status\": \"\", \"value\": \"\"},\n    \"AR06_charging_interface\": {\"status\": \"\", \"value\": \"\"},\n    \"AR07_connectivity\": {\"status\": \"\", \"value\": \"\"},\n    \"AR08_ai_transcription\": {\"status\": \"\", \"value\": \"\"},\n    \"AR09_app_cloud\": {\"status\": \"\", \"value\": \"\"},\n    \"AR10_languages\": {\"status\": \"\", \"value\": \"\"},\n    \"AR11_customization\": {\"status\": \"\", \"value\": \"\"},\n    \"AR12_quantity\": {\"status\": \"\", \"value\": \"\"}\n  },\n  \"quote_readiness\": {\n    \"status\": \"\",\n    \"score\": 0,\n    \"hard_blockers\": []\n  },\n  \"missing_information\": [],\n  \"internal_routing\": {\n    \"sales\": [],\n    \"engineering\": [],\n    \"procurement\": [],\n    \"compliance\": []\n  },\n  \"recommended_next_action\": \"\",\n  \"buyer_questions\": [],\n  \"internal_summary_cn\": \"\"\n}STRICT OUTPUT RULES:\n\nquote_readiness.status MUST be exactly one of these four values:\n\"Q0\"\n\"Q1\"\n\"Q2\"\n\"Q3\"\n\nDo NOT output:\n\"Clarification Required\"\n\"Q1 - Clarification Required\"\n\"Ready for Internal Review\"\nor any other wording in quote_readiness.status.\n\nIf a descriptive label is useful, put it in:\nquote_readiness.status_label\n\nExamples:\n{\n  \"status\": \"Q1\",\n  \"status_label\": \"Clarification Required\"\n}\n\nThe workflow depends on the exact Q0/Q1/Q2/Q3 value."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        -320,
+        128
+      ],
+      "id": "368195b9-2b89-42a4-84de-97175979f093",
+      "name": "Message a model"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nlet text =\n  data.output?.[0]?.content?.find(item => item.type === 'output_text')?.text;\n\nif (!text) {\n  throw new Error('No AI JSON text found');\n}\n\ntext = text\n  .trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/\\s*```$/, '');\n\nconst result = JSON.parse(text);\n\n// Normalize Quote Readiness status\nconst originalStatus = String(\n  result.quote_readiness?.status ?? ''\n).trim();\n\nconst status = originalStatus.toLowerCase();\n\nlet normalizedStatus;\n\nif (\n  status.startsWith('q0') ||\n  status.includes('insufficient')\n) {\n  normalizedStatus = 'Q0';\n} else if (\n  status.startsWith('q1') ||\n  status.includes('clarification')\n) {\n  normalizedStatus = 'Q1';\n} else if (\n  status.startsWith('q2') ||\n  status.includes('internal review')\n) {\n  normalizedStatus = 'Q2';\n} else if (\n  status.startsWith('q3') ||\n  status.includes('ready to quote')\n) {\n  normalizedStatus = 'Q3';\n} else {\n  throw new Error(\n    `Unknown quote readiness status: ${originalStatus}`\n  );\n}\n\n// Preserve AI's original wording for reference\nresult.quote_readiness.status_label = originalStatus;\n\n// Give downstream workflow one stable value\nresult.quote_readiness.status = normalizedStatus;\n\nreturn [\n  {\n    json: result\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        -16
+      ],
+      "id": "867d3a46-c2b1-4558-a8d1-bd6e3eb97c80",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.quote_readiness.status }}",
+                    "rightValue": "Q0",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "32037f76-caaf-4b42-b91a-0c18c7f71311"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Q0"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9015dc19-3ba9-46d0-a314-9ed23e830f9f",
+                    "leftValue": "={{ $json.quote_readiness.status }}",
+                    "rightValue": "Q1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Q1"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "08a46c0b-156c-4844-a9c8-fa88248f0a05",
+                    "leftValue": "={{ $json.quote_readiness.status }}",
+                    "rightValue": "Q2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Q2"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0f9d55d7-c818-4043-b1d2-bf1502973e7c",
+                    "leftValue": "={{ $json.quote_readiness.status }}",
+                    "rightValue": "Q3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Q3"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        -48
+      ],
+      "id": "bc3c1607-52a3-459a-9fbc-df9e83f72283",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-5-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are an experienced B2B export sales representative for a Chinese consumer electronics OEM/ODM manufacturer.\n\nYour task is to draft a professional clarification email to the buyer because the RFQ is not yet ready for quotation.\n\nBuyer:\nName: {{ $json.buyer.name }}\nCompany: {{ $json.buyer.company }}\nMarket: {{ $json.buyer.country_market }}\n\nProduct:\nCategory: {{ $json.product.category }}\nQuantity: {{ $json.product.quantity }}\n\nQuote Readiness:\n{{ $json.quote_readiness.status }}\n\nHard Blockers:\n{{ JSON.stringify($json.quote_readiness.hard_blockers) }}\n\nMissing Information:\n{{ JSON.stringify($json.missing_information) }}\n\nQuestions Already Recommended by the RFQ Analyzer:\n{{ JSON.stringify($json.buyer_questions) }}\n\nRecommended Next Action:\n{{ $json.recommended_next_action }}\n\nWrite a concise, natural, professional B2B email in English.\n\nRules:\n- Thank the buyer for the inquiry.\n- Briefly confirm the product and quantity already understood.\n- Ask only the information actually needed to move the RFQ toward quotation.\n- Group related technical questions when possible.\n- Do not invent specifications.\n- Do not provide a price.\n- Do not promise technical feasibility before engineering review.\n- Do not sound robotic or overly formal.\n- Keep the email practical and easy for the buyer to answer.\n- Maximum 220 words.\n\nReturn exactly this format:\n\nSubject: ...\n\nBody:\n\nDear ...,\n\n...\n\nBest regards,\nExport Sales Team"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        -32
+      ],
+      "id": "7f7734e0-1bd0-4dc7-ae2e-d8ac67fc3b19",
+      "name": "Message a model1"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "AI_Export_RFQ_Records"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rfq_id": "={{ 'RFQ-' + $('On form submission').item.json.submittedAt }}",
+            "buyer_name": "={{ $('Code in JavaScript').item.json.buyer.name }}",
+            "company_name": "={{ $('Code in JavaScript').item.json.buyer.company }}",
+            "email": "={{ $('Code in JavaScript').item.json.buyer.email }}",
+            "country_market": "={{ $('Code in JavaScript').item.json.buyer.country_market }}",
+            "product_category": "={{ $('Code in JavaScript').item.json.product.category }}",
+            "quantity": "={{ Number(String($('Code in JavaScript').item.json.product.quantity).replace(/,/g,'')) }}",
+            "original_rfq": "={{ $('On form submission').item.json[\"RFQ / Product Requirements\"] }}",
+            "quote_status": "={{ $('Code in JavaScript').item.json.quote_readiness.status }}",
+            "quote_score": "={{ $('Code in JavaScript').item.json.quote_readiness.score }}",
+            "hard_blockers": "={{ JSON.stringify($('Code in JavaScript').item.json.quote_readiness.hard_blockers) }}",
+            "missing_information": "={{ JSON.stringify($('Code in JavaScript').item.json.missing_information) }}",
+            "recommended_next_action": "={{ $('Code in JavaScript').item.json.recommended_next_action }}",
+            "clarification_email": "={{ $json.output[0].content[0].text }}",
+            "internal_summary_cn": "={{ $('Code in JavaScript').item.json.internal_summary_cn }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rfq_id",
+              "displayName": "rfq_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "buyer_name",
+              "displayName": "buyer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "country_market",
+              "displayName": "country_market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "product_category",
+              "displayName": "product_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "quantity",
+              "displayName": "quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "original_rfq",
+              "displayName": "original_rfq",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "quote_status",
+              "displayName": "quote_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "quote_score",
+              "displayName": "quote_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "hard_blockers",
+              "displayName": "hard_blockers",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "missing_information",
+              "displayName": "missing_information",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "recommended_next_action",
+              "displayName": "recommended_next_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "clarification_email",
+              "displayName": "clarification_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "internal_summary_cn",
+              "displayName": "internal_summary_cn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        -32
+      ],
+      "id": "d95b49d9-1cbc-4b71-b03e-e9f857d9e3d7",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        -32
+      ],
+      "id": "e213c507-6038-4b6e-9ac6-935a8e05a0eb",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nreturn [{\n  json: {\n    ...data,\n    follow_up_status: \"DUE\",\n    follow_up_type: \"RFQ_CLARIFICATION\",\n    follow_up_message: \"Follow up with buyer: clarification is still required before quotation.\",\n    follow_up_created_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -32
+      ],
+      "id": "1ad3e77c-3cc6-4d18-bf9c-ab0470da2224",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": [],
+  "notes": "Sanitized portfolio export. Reconnect OpenAI credentials and select/create the AI_Export_RFQ_Records Data Table after import. Environment-specific webhook, credential, workspace, instance, and workflow IDs were removed."
+}
